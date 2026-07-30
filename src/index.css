@@ -1,11 +1,97 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 /* KaTeX fix: Prevent KaTeX from displaying fallback MathML text alongside rendered HTML */
 .katex-mathml {
   display: none !important;
 }
 
+/* Enhanced KaTeX styling for professional math display */
 .math-content .katex {
   font-size: 1.05em;
-  line-height: 1.2;
+  line-height: 1.6;
+}
+
+.katex-display {
+  margin: 1rem 0;
+  padding: 0.75rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Scrollbar styling for long math formulas */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(203 213 225) rgb(241 245 249);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgb(241 245 249);
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225);
+  border-radius: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184);
+}
+
+/* Math content responsive behavior */
+.math-content {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* Mobile optimization */
+@media (max-width: 640px) {
+  .math-content .katex {
+    font-size: 0.95em;
+  }
+  
+  .katex-display {
+    font-size: 0.9em;
+    padding: 0.5rem 0;
+  }
+}
+
+/* Tablet optimization */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .math-content .katex {
+    font-size: 1em;
+  }
+}
+
+/* Print optimization */
+@media print {
+  .katex-display {
+    page-break-inside: avoid;
+  }
+  
+  .math-content .katex {
+    font-size: 1em;
+  }
+}
+
+/* Ensure proper color inheritance in all themes */
+.katex .base,
+.katex .strut,
+.katex .mord,
+.katex .mbin,
+.katex .mrel {
+  color: inherit;
+}
+
+/* Accessibility: Focus states for interactive math */
+.math-content:focus-within {
+  outline: 2px solid rgb(99 102 241);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
