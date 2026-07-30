@@ -1,0 +1,6 @@
+{
+  "name": "EduMath AI - Nền Tảng Ôn Tập Toán THCS",
+  "description": "Nền tảng hỗ trợ học sinh THCS ôn tập Toán, phân tích lỗi sai và cá nhân hóa lộ trình học tập bằng AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* KaTeX fix: Prevent KaTeX from displaying fallback MathML text alongside rendered HTML */
+.katex-mathml {
+  display: none !important;
+}
+
+.math-content .katex {
+  font-size: 1.05em;
+  line-height: 1.2;
+}
