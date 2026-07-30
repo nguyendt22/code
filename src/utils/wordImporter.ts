@@ -9,37 +9,87 @@ import { Question, QuestionType, CognitiveLevel } from '../types';
 import { autoFormatQuestion } from './autoMathFormatter';
 
 /**
- * Simple DOCX text extractor (fallback without external library)
- * Extracts text from .docx XML structure
+ * Enhanced DOCX text extractor using JSZip-like approach
+ * DOCX is actually a ZIP file containing XML files
  */
 async function extractTextFromDocx(file: File): Promise<string> {
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
     
-    // Convert to string
-    const text = new TextDecoder('utf-8').decode(uint8Array);
+    // DOCX is a ZIP file - look for the ZIP signature
+    const view = new DataView(arrayBuffer);
+    const isZip = view.getUint32(0, true) === 0x04034b50; // ZIP file signature
     
-    // Find document.xml content between <w:t> tags (Word 2007+ format)
-    const matches = text.match(/<w:t[^>]*>([^<]+)<\/w:t>/g);
-    
-    if (matches && matches.length > 0) {
-      return matches
-        .map(match => match.replace(/<[^>]+>/g, ''))
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+    if (!isZip) {
+      throw new Error('File không đúng định dạng .docx (không phải ZIP)');
     }
     
-    // Fallback: extract all readable text
-    return text
-      .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, ' ')
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
+    // Convert to UTF-8 string to find XML content
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const rawText = new TextDecoder('utf-8', { fatal: false }).decode(uint8Array);
+    
+    // Look for document.xml content (main document text in DOCX)
+    // Pattern: word/document.xml contains the actual text
+    const docXmlMatch = rawText.match(/word\/document\.xml/);
+    
+    if (!docXmlMatch) {
+      throw new Error('Không tìm thấy document.xml trong file Word');
+    }
+    
+    // Extract all <w:t> tags (Word text runs)
+    const textMatches = rawText.match(/<w:t[^>]*>([^<]*)<\/w:t>/g);
+    
+    if (textMatches && textMatches.length > 0) {
+      let extractedText = textMatches
+        .map(match => {
+          // Remove XML tags
+          const text = match.replace(/<\/?w:t[^>]*>/g, '');
+          // Decode XML entities
+          return text
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&apos;/g, "'");
+        })
+        .join(' ')
+        .trim();
+      
+      if (extractedText.length > 10) {
+        return extractedText;
+      }
+    }
+    
+    // Fallback: try to extract any readable Unicode text
+    let fallbackText = '';
+    for (let i = 0; i < uint8Array.length - 1; i++) {
+      const char = String.fromCharCode(uint8Array[i]);
+      // Vietnamese + ASCII printable
+      if (
+        (char >= ' ' && char <= '~') || // ASCII printable
+        (char >= 'À' && char <= 'ỹ') || // Vietnamese
+        char === '\n' || char === '\r'
+      ) {
+        fallbackText += char;
+      }
+    }
+    
+    // Clean up fallback text
+    fallbackText = fallbackText
+      .replace(/[\x00-\x1F]+/g, ' ') // Remove control chars
+      .replace(/\s{3,}/g, '\n') // Multiple spaces to newline
+      .replace(/[^\w\s\dÀ-ỹ.,;:?!()\-+=/\\$%<>]/g, ' ') // Keep only valid chars
       .trim();
-  } catch (err) {
+    
+    if (fallbackText.length > 10) {
+      return fallbackText;
+    }
+    
+    throw new Error('Không trích xuất được text từ file Word.\n\nGợi ý:\n1. Lưu file thành .txt\n2. Copy-paste nội dung\n3. Dùng Excel import');
+    
+  } catch (err: any) {
     console.error('Error extracting DOCX text:', err);
-    throw new Error('Không thể đọc file Word. Vui lòng thử file .txt hoặc copy-paste nội dung.');
+    throw new Error(err.message || 'Không thể đọc file Word. Vui lòng thử file .txt hoặc Excel.');
   }
 }
 
@@ -201,4 +251,79 @@ export async function importQuestionsFromWord(
   }
   
   return { questions, errors, warnings };
+}
+
+/**
+ * Import questions from bulk text (copy-paste from Word/anywhere)
+ * This is more reliable than trying to parse Word binary
+ */
+export function importQuestionsFromBulkText(
+  text: string,
+  grade: number,
+  autoFormat: boolean
+): {
+  questions: Question[];
+  errors: string[];
+} {
+  const questions: Question[] = [];
+  const errors: string[] = [];
+  
+  try {
+    // Clean up text
+    const cleanText = text
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .trim();
+    
+    if (!cleanText) {
+      return { questions, errors };
+    }
+    
+    // Split by lines
+    const lines = cleanText.split('\n').filter(line => line.trim().length > 3);
+    
+    // Detect if numbered format
+    const hasNumbering = lines.some(line => /^\d+[\.\)]\s/.test(line.trim()));
+    
+    if (hasNumbering) {
+      // Numbered format: group multi-line questions
+      let currentQuestion = '';
+      
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        
+        if (/^\d+[\.\)]\s/.test(trimmed)) {
+          // Save previous question
+          if (currentQuestion.trim().length > 5) {
+            questions.push(createQuestionFromText(currentQuestion.trim(), grade, autoFormat));
+          }
+          // Start new question
+          currentQuestion = trimmed.replace(/^\d+[\.\)]\s*/, '');
+        } else if (currentQuestion) {
+          // Continue current question
+          currentQuestion += ' ' + trimmed;
+        } else if (trimmed.length > 5) {
+          // Standalone line without number
+          currentQuestion = trimmed;
+        }
+      });
+      
+      // Save last question
+      if (currentQuestion.trim().length > 5) {
+        questions.push(createQuestionFromText(currentQuestion.trim(), grade, autoFormat));
+      }
+    } else {
+      // Simple format: each line is a question
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (trimmed.length > 5) {
+          questions.push(createQuestionFromText(trimmed, grade, autoFormat));
+        }
+      });
+    }
+  } catch (err: any) {
+    errors.push(err.message || 'Lỗi xử lý text');
+  }
+  
+  return { questions, errors };
 }

@@ -15,7 +15,7 @@ import { MathRenderer } from "../common/MathRenderer";
 import { MathInputKeypad } from "../common/MathInputKeypad";
 import { autoFormatQuestion, smartFormatVietnameseQuestion, validateMathFormatting } from "../../utils/autoMathFormatter";
 import { importQuestionsFromExcel, downloadExcelTemplate } from "../../utils/excelImporter";
-import { importQuestionsFromWord } from "../../utils/wordImporter";
+import { importQuestionsFromWord, importQuestionsFromBulkText } from "../../utils/wordImporter";
 import {
   FileText, Plus, Upload, Save, Eye, Trash2, Edit3, Check, X,
   AlertCircle, ChevronUp, ChevronDown, Copy, FileSpreadsheet,
@@ -44,6 +44,8 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
   const [activeTab, setActiveTab] = useState<"info" | "questions" | "preview">("info");
   const [showAddQuestionModal, setShowAddQuestionModal] = useState(false);
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
+  const [showBulkImportModal, setShowBulkImportModal] = useState(false);
+  const [bulkImportText, setBulkImportText] = useState("");
   
   // New question form
   const [newQuestionText, setNewQuestionText] = useState("");
@@ -184,6 +186,29 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
 
     onSave?.(exam);
     alert(`Đã lưu đề thi "${examTitle}" với ${examQuestions.length} câu hỏi!`);
+  };
+
+  /**
+   * Import from bulk text (copy-paste)
+   */
+  const handleBulkImport = () => {
+    if (!bulkImportText.trim()) {
+      alert("Vui lòng nhập nội dung câu hỏi!");
+      return;
+    }
+
+    const result = importQuestionsFromBulkText(bulkImportText, examGrade, autoFormatEnabled);
+    
+    if (result.questions.length === 0) {
+      alert("❌ Không tìm thấy câu hỏi nào.\n\nHướng dẫn:\n- Mỗi dòng là 1 câu hỏi\n- Hoặc đánh số: 1. Câu hỏi, 2. Câu hỏi");
+      return;
+    }
+
+    setExamQuestions([...examQuestions, ...result.questions]);
+    setBulkImportText("");
+    setShowBulkImportModal(false);
+    
+    alert(`✅ Đã import thành công ${result.questions.length} câu hỏi!`);
   };
 
   /**
@@ -457,6 +482,14 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
                   Thêm Câu Hỏi Mới
                 </button>
                 
+                <button
+                  onClick={() => setShowBulkImportModal(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm"
+                >
+                  <Copy className="w-4 h-4 inline mr-1" />
+                  Copy-Paste Nhiều Câu
+                </button>
+                
                 <label className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer">
                   <FileSpreadsheet className="w-4 h-4 inline mr-1" />
                   Import Excel/CSV
@@ -468,9 +501,9 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
                   />
                 </label>
                 
-                <label className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer">
+                <label className="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer">
                   <Upload className="w-4 h-4 inline mr-1" />
-                  Import Word/Text
+                  Upload File Text
                   <input
                     type="file"
                     accept=".txt,.doc,.docx"
@@ -782,6 +815,87 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
                 >
                   <Plus className="w-4 h-4 inline mr-1" />
                   Thêm Câu Hỏi
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Modal (Copy-Paste) */}
+      {showBulkImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-6 border-b border-slate-200 pb-4">
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">Import Câu Hỏi Từ Word/Text</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Copy-paste nội dung từ Word hoặc file text. Đáng tin cậy hơn việc upload file!
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBulkImportModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-700 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Instructions */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h4 className="text-sm font-bold text-blue-900 mb-2">📝 Hướng dẫn:</h4>
+                <ul className="text-xs text-blue-800 space-y-1 ml-4 list-disc">
+                  <li>Mỗi dòng là một câu hỏi HOẶC đánh số: <code className="bg-white px-1 rounded">1. Câu hỏi, 2. Câu hỏi...</code></li>
+                  <li>Công thức toán sẽ tự động format (nếu bật Auto-Format)</li>
+                  <li>VD: <code className="bg-white px-1 rounded">Giải phương trình x^2 - 4 = 0</code></li>
+                  <li><strong>Khuyến nghị:</strong> Mở file Word → Copy tất cả (Ctrl+A, Ctrl+C) → Paste vào đây</li>
+                </ul>
+              </div>
+
+              {/* Textarea */}
+              <div>
+                <label className="text-sm font-bold text-slate-700 block mb-2">
+                  Nội dung câu hỏi ({bulkImportText.split('\n').filter(l => l.trim().length > 3).length} dòng)
+                </label>
+                <textarea
+                  value={bulkImportText}
+                  onChange={(e) => setBulkImportText(e.target.value)}
+                  placeholder={"Paste nội dung từ Word vào đây...\n\nVí dụ:\n1. Giải phương trình x^2 - 4 = 0\n2. Tính giá trị biểu thức 2x + 3 khi x = 5\n3. Tìm x biết x/4 = 3/2"}
+                  className="w-full h-64 p-4 border border-slate-300 rounded-xl text-sm font-mono resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+
+              {/* Auto-format status */}
+              <div className="flex items-center gap-2 text-sm">
+                {autoFormatEnabled ? (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-500" />
+                    <span className="text-amber-700 font-semibold">Auto-format BẬT - Công thức toán sẽ tự động được format</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="w-4 h-4 text-slate-400" />
+                    <span className="text-slate-600">Auto-format TẮT - Bạn cần tự thêm $ cho công thức</span>
+                  </>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={() => { setBulkImportText(""); setShowBulkImportModal(false); }}
+                  className="flex-1 px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleBulkImport}
+                  disabled={!bulkImportText.trim()}
+                  className="flex-1 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Copy className="w-4 h-4 inline mr-1" />
+                  Import Câu Hỏi
                 </button>
               </div>
             </div>

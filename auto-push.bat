@@ -18,7 +18,7 @@ git add .
 echo.
 
 echo [3/4] Creating commit...
-git commit -m "Feature: Complete Exam Creator with auto math formatting" -m "Added comprehensive exam creation feature for teachers:" -m "- autoMathFormatter.ts: Auto-detect and wrap math formulas in $ delimiters" -m "- ExamCreator.tsx: Full exam creation UI with question management" -m "- excelImporter.ts: Import questions from Excel/CSV files" -m "- TeacherDashboard.tsx: Integrated Exam Creator with UI" -m "" -m "Teachers can now:" -m "- Create exams manually with visual math editor" -m "- Import questions from Excel/CSV files" -m "- Download Excel template for bulk question upload" -m "- Auto-format math expressions (toggle on/off)" -m "- Preview exams before saving" -m "- View all created exams in dashboard"
+git commit -m "Fix: Word file import with proper text extraction" -m "- Created wordImporter.ts utility for .doc/.docx files" -m "- Extracts text from Word binary/XML format" -m "- Supports numbered and plain text question formats" -m "- Better error messages for unsupported formats" -m "- Updated ExamCreator to use new Word importer" -m "- Changed button label to 'Import Word/Text'"
 echo.
 
 echo [4/4] Pushing to GitHub...
@@ -31,10 +31,9 @@ if %errorlevel% equ 0 (
     echo  Vercel will auto-deploy in 1-2 minutes
     echo.
     echo  NEW FEATURES DEPLOYED:
-    echo  - Exam Creator with auto math formatting
-    echo  - Excel/CSV import functionality
-    echo  - Visual math editor integration
-    echo  - Created exams display in dashboard
+    echo  - Word file import (.doc/.docx) with text extraction
+    echo  - Better error messages for unsupported formats
+    echo  - Support for numbered question format
     echo.
     echo  TESTING STEPS:
     echo  1. Wait for Vercel deployment
