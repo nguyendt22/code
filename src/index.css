@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "katex/dist/katex.min.css";
 
 /* KaTeX fix: Prevent KaTeX from displaying fallback MathML text alongside rendered HTML */
 .katex-mathml {

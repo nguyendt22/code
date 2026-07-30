@@ -119,88 +119,94 @@ export const MathRenderer: React.FC<MathRendererProps> = ({
   };
 
   const renderFormattedText = (rawText: string) => {
-    const text = normalizeMathText(rawText);
+    try {
+      const text = normalizeMathText(rawText);
 
-    // Regex splits by $$...$$ (block math) and $...$ (inline math)
-    const regex = /(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$)/g;
-    const parts = text.split(regex);
+      // Regex splits by $$...$$ (block math) and $...$ (inline math)
+      const regex = /(\$\$[\s\S]+?\$\$|\$[\s\S]+?\$)/g;
+      const parts = text.split(regex);
 
-    return parts.map((part, index) => {
-      if (!part) return null;
+      return parts.map((part, index) => {
+        if (!part) return null;
 
-      // Block Math $$ ... $$
-      if (part.startsWith("$$") && part.endsWith("$$") && part.length >= 4) {
-        const math = part.slice(2, -2).trim();
-        try {
-          const html = katex.renderToString(math, {
-            displayMode: true,
-            throwOnError: false,
-            output: "html",
-            strict: false,
-            trust: false,
-            macros: {
-              "\\RR": "\\mathbb{R}",
-              "\\NN": "\\mathbb{N}",
-              "\\ZZ": "\\mathbb{Z}",
-              "\\QQ": "\\mathbb{Q}"
-            }
-          });
-          return (
-            <div
-              key={index}
-              className="my-3 overflow-x-auto overflow-y-hidden py-2 text-center font-serif text-slate-900 max-w-full scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 rounded"
-              style={{ fontSize: "1.1em", lineHeight: "1.6" }}
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
-          );
-        } catch (e) {
-          console.error("KaTeX render error (block):", e, "Math:", math);
-          return (
-            <div key={index} className="my-2 text-center font-mono text-xs text-rose-500 bg-rose-50 p-2 rounded border border-rose-200">
-              ⚠️ Công thức lỗi: {math}
-            </div>
-          );
+        // Block Math $$ ... $$
+        if (part.startsWith("$$") && part.endsWith("$$") && part.length >= 4) {
+          const math = part.slice(2, -2).trim();
+          try {
+            const html = katex.renderToString(math, {
+              displayMode: true,
+              throwOnError: false,
+              output: "html",
+              strict: false,
+              trust: false,
+              macros: {
+                "\\RR": "\\mathbb{R}",
+                "\\NN": "\\mathbb{N}",
+                "\\ZZ": "\\mathbb{Z}",
+                "\\QQ": "\\mathbb{Q}"
+              }
+            });
+            return (
+              <div
+                key={index}
+                className="my-3 overflow-x-auto overflow-y-hidden py-2 text-center font-serif text-slate-900 max-w-full scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100 rounded"
+                style={{ fontSize: "1.1em", lineHeight: "1.6" }}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            );
+          } catch (e) {
+            console.error("KaTeX render error (block):", e, "Math:", math);
+            return (
+              <div key={index} className="my-2 text-center font-mono text-xs text-rose-500 bg-rose-50 p-2 rounded border border-rose-200">
+                ⚠️ Công thức lỗi: {math}
+              </div>
+            );
+          }
         }
-      }
 
-      // Inline Math $ ... $
-      if (part.startsWith("$") && part.endsWith("$") && part.length >= 2) {
-        const math = part.slice(1, -1).trim();
-        try {
-          const html = katex.renderToString(math, {
-            displayMode: false,
-            throwOnError: false,
-            output: "html",
-            strict: false,
-            trust: false,
-            macros: {
-              "\\RR": "\\mathbb{R}",
-              "\\NN": "\\mathbb{N}",
-              "\\ZZ": "\\mathbb{Z}",
-              "\\QQ": "\\mathbb{Q}"
-            }
-          });
-          return (
-            <span
-              key={index}
-              className="inline-block mx-0.5 align-middle text-slate-900 font-serif"
-              style={{ fontSize: "1.05em" }}
-              dangerouslySetInnerHTML={{ __html: html }}
-            />
-          );
-        } catch (e) {
-          console.error("KaTeX render error (inline):", e, "Math:", math);
-          return (
-            <span key={index} className="inline-block px-1.5 py-0.5 font-mono text-xs text-rose-500 bg-rose-50 rounded border border-rose-200">
-              ⚠️ {math}
-            </span>
-          );
+        // Inline Math $ ... $
+        if (part.startsWith("$") && part.endsWith("$") && part.length >= 2) {
+          const math = part.slice(1, -1).trim();
+          try {
+            const html = katex.renderToString(math, {
+              displayMode: false,
+              throwOnError: false,
+              output: "html",
+              strict: false,
+              trust: false,
+              macros: {
+                "\\RR": "\\mathbb{R}",
+                "\\NN": "\\mathbb{N}",
+                "\\ZZ": "\\mathbb{Z}",
+                "\\QQ": "\\mathbb{Q}"
+              }
+            });
+            return (
+              <span
+                key={index}
+                className="inline-block mx-0.5 align-middle text-slate-900 font-serif"
+                style={{ fontSize: "1.05em" }}
+                dangerouslySetInnerHTML={{ __html: html }}
+              />
+            );
+          } catch (e) {
+            console.error("KaTeX render error (inline):", e, "Math:", math);
+            return (
+              <span key={index} className="inline-block px-1.5 py-0.5 font-mono text-xs text-rose-500 bg-rose-50 rounded border border-rose-200">
+                ⚠️ {math}
+              </span>
+            );
+          }
         }
-      }
 
-      // Plain text part - preserve whitespace and line breaks
-      return <span key={index} className="whitespace-pre-wrap">{part}</span>;
-    });
+        // Plain text part - preserve whitespace and line breaks
+        return <span key={index} className="whitespace-pre-wrap">{part}</span>;
+      });
+    } catch (error) {
+      console.error("MathRenderer error:", error, "Content:", rawText);
+      // Fallback to plain text if everything fails
+      return <span>{rawText}</span>;
+    }
   };
 
   return <span className={`math-content ${className}`}>{renderFormattedText(content)}</span>;
