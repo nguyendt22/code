@@ -15,6 +15,7 @@ import { MathRenderer } from "../common/MathRenderer";
 import { MathInputKeypad } from "../common/MathInputKeypad";
 import { autoFormatQuestion, smartFormatVietnameseQuestion, validateMathFormatting } from "../../utils/autoMathFormatter";
 import { importQuestionsFromExcel, downloadExcelTemplate } from "../../utils/excelImporter";
+import { importQuestionsFromWord } from "../../utils/wordImporter";
 import {
   FileText, Plus, Upload, Save, Eye, Trash2, Edit3, Check, X,
   AlertCircle, ChevronUp, ChevronDown, Copy, FileSpreadsheet,
@@ -222,47 +223,78 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
   };
 
   /**
-   * Import questions from text file
+   * Import questions from text/Word file
    */
-  const handleImportTextFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportTextFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      if (!text) return;
-
-      // Simple parser: each line is a question
-      const lines = text.split('\n').filter(line => line.trim().length > 5);
+    try {
+      const fileName = file.name.toLowerCase();
       
-      const imported: Question[] = lines.map((line, idx) => {
-        const rawQ: Question = {
-          id: `imported-${Date.now()}-${idx}`,
-          text: line.trim(),
-          type: "short_answer",
-          correctAnswer: "",
-          explanation: "Import từ file",
+      // Check if Word file
+      if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) {
+        const result = await importQuestionsFromWord(file, {
           grade: examGrade,
-          semester: 1,
-          chapterId: "custom",
-          chapterName: "Import",
-          lessonId: "custom",
-          lessonName: "Import",
-          topicName: examTitle,
-          cognitiveLevel: "Thông hiểu",
-          difficulty: "Trung bình",
-          tags: [`Import ${file.name}`]
+          autoFormat: autoFormatEnabled
+        });
+
+        if (result.errors.length > 0) {
+          alert("❌ Lỗi import Word:\n\n" + result.errors.join("\n"));
+          e.target.value = "";
+          return;
+        }
+
+        setExamQuestions([...examQuestions, ...result.questions]);
+        
+        let message = `✅ Đã import thành công ${result.questions.length} câu hỏi từ file Word`;
+        if (result.warnings.length > 0) {
+          message += "\n\n⚠️ Lưu ý:\n" + result.warnings.join("\n");
+        }
+        
+        alert(message);
+      } else {
+        // Plain text file
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const text = event.target?.result as string;
+          if (!text) return;
+
+          // Simple parser: each line is a question
+          const lines = text.split('\n').filter(line => line.trim().length > 5);
+          
+          const imported: Question[] = lines.map((line, idx) => {
+            const rawQ: Question = {
+              id: `imported-${Date.now()}-${idx}`,
+              text: line.trim(),
+              type: "short_answer",
+              correctAnswer: "",
+              explanation: "Import từ file",
+              grade: examGrade,
+              semester: 1,
+              chapterId: "custom",
+              chapterName: "Import",
+              lessonId: "custom",
+              lessonName: "Import",
+              topicName: examTitle,
+              cognitiveLevel: "Thông hiểu",
+              difficulty: "Trung bình",
+              tags: [`Import ${file.name}`]
+            };
+            
+            return autoFormatEnabled ? autoFormatQuestion(rawQ) : rawQ;
+          });
+
+          setExamQuestions([...examQuestions, ...imported]);
+          alert(`✅ Đã import ${imported.length} câu hỏi từ file ${file.name}`);
         };
         
-        return autoFormatEnabled ? autoFormatQuestion(rawQ) : rawQ;
-      });
-
-      setExamQuestions([...examQuestions, ...imported]);
-      alert(`Đã import ${imported.length} câu hỏi từ file ${file.name}`);
-    };
+        reader.readAsText(file, 'utf-8');
+      }
+    } catch (err: any) {
+      alert("❌ Lỗi import file: " + err.message);
+    }
     
-    reader.readAsText(file);
     e.target.value = ""; // Reset input
   };
 
@@ -438,7 +470,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
                 
                 <label className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer">
                   <Upload className="w-4 h-4 inline mr-1" />
-                  Import Text
+                  Import Word/Text
                   <input
                     type="file"
                     accept=".txt,.doc,.docx"
