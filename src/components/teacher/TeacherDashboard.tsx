@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { SchoolClass } from "../../types";
-import { Users, FileText, AlertTriangle, UploadCloud, Plus, ArrowRight, BarChart3, CheckCircle2 } from "lucide-react";
+import { SchoolClass, Exam } from "../../types";
+import { Users, FileText, AlertTriangle, UploadCloud, Plus, ArrowRight, BarChart3, CheckCircle2, FileEdit } from "lucide-react";
 import { getTeacherClasses, TeacherClassItem } from "../../data/teacherClassStore";
 import { getTeacherStudents, normalizeClassName, TeacherStudent } from "../../data/teacherStudentStore";
+import { ExamCreator } from "./ExamCreator";
 
 interface TeacherDashboardProps {
   onNavigate: (view: string) => void;
@@ -11,6 +12,8 @@ interface TeacherDashboardProps {
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }) => {
   const [teacherClasses, setTeacherClasses] = useState<TeacherClassItem[]>(() => getTeacherClasses());
   const [teacherStudents, setTeacherStudents] = useState<TeacherStudent[]>(() => getTeacherStudents());
+  const [showExamCreator, setShowExamCreator] = useState(false);
+  const [createdExams, setCreatedExams] = useState<Exam[]>([]);
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -30,6 +33,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
   const class7A1Students = teacherStudents.filter((s) => normalizeClassName(s.className) === "7A1");
   const count7A1 = class7A1Students.length || 38;
 
+  /**
+   * Handle exam save from ExamCreator
+   */
+  const handleSaveExam = (exam: Exam) => {
+    setCreatedExams([...createdExams, exam]);
+    setShowExamCreator(false);
+    alert(`✅ Đã lưu đề thi "${exam.title}" thành công!\n\nSố câu hỏi: ${exam.questions.length}\nThời gian: ${exam.duration} phút`);
+  };
+
   return (
     <div className="space-y-6">
       {/* Teacher Header Banner */}
@@ -47,6 +59,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowExamCreator(true)}
+            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
+          >
+            <FileEdit className="w-4 h-4" /> Tạo Đề Thi
+          </button>
           <button
             onClick={() => onNavigate("teacher_ai_docs")}
             className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
@@ -118,6 +136,56 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ onNavigate }
           })}
         </div>
       </div>
+
+      {/* Created Exams Section */}
+      {createdExams.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-base font-bold text-slate-900">Đề Thi Đã Tạo ({createdExams.length})</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {createdExams.map((exam) => (
+              <div key={exam.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-slate-900">{exam.title}</h3>
+                    <p className="text-xs text-slate-500 mt-1">{exam.description}</p>
+                  </div>
+                  <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md">
+                    Khối {exam.grade}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-4 text-xs text-slate-600">
+                  <div className="flex items-center gap-1">
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>{exam.questions.length} câu</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>{exam.duration} phút</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100 flex gap-2">
+                  <button className="flex-1 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg transition-colors">
+                    Xem Chi Tiết
+                  </button>
+                  <button className="flex-1 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg transition-colors">
+                    Giao Bài
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ExamCreator Modal */}
+      {showExamCreator && (
+        <ExamCreator
+          onSave={handleSaveExam}
+          onClose={() => setShowExamCreator(false)}
+        />
+      )}
     </div>
   );
 };
