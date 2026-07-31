@@ -190,87 +190,112 @@ export class DocxParser {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Walk through all elements
-    const walker = document.createTreeWalker(
-      doc.body,
-      NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT,
-      null
-    );
-    
-    let node;
     let equationIndex = 0;
     
-    while (node = walker.nextNode()) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.trim();
-        if (text) {
-          blocks.push({
-            type: 'text',
-            value: text
-          });
-        }
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const element = node as Element;
+    // Process each paragraph separately to preserve structure
+    const paragraphs = doc.body.querySelectorAll('p, h1, h2, h3, li');
+    
+    paragraphs.forEach((para) => {
+      const text = para.textContent?.trim();
+      
+      if (text) {
+        // Split by newlines within the paragraph
+        const lines = text.split('\n').map(l => l.trim()).filter(l => l);
         
-        // Images
-        if (element.tagName === 'IMG') {
-          const src = element.getAttribute('src');
+        lines.forEach(line => {
+          if (line) {
+            blocks.push({
+              type: 'text',
+              value: line
+            });
+          }
+        });
+        
+        // Check for images in this paragraph
+        const imgs = para.querySelectorAll('img');
+        imgs.forEach(img => {
+          const src = img.getAttribute('src');
           if (src) {
             blocks.push({
               type: 'image',
               src,
-              alt: element.getAttribute('alt') || undefined,
+              alt: img.getAttribute('alt') || undefined,
               isMathEquation: false
             });
           }
-        }
-        
-        // Paragraph breaks
-        if (element.tagName === 'P' && !element.textContent?.trim()) {
-          blocks.push({
-            type: 'paragraph_break'
-          });
-        }
-        
-        // Tables
-        if (element.tagName === 'TABLE') {
-          const rows: string[][] = [];
-          const trs = element.querySelectorAll('tr');
-          trs.forEach(tr => {
-            const row: string[] = [];
-            tr.querySelectorAll('td, th').forEach(cell => {
-              row.push(cell.textContent?.trim() || '');
-            });
-            rows.push(row);
-          });
-          
-          if (rows.length > 0) {
-            blocks.push({
-              type: 'table',
-              rows
-            });
-          }
-        }
-        
-        // Math equations (placeholder for now)
-        // We'll replace these with actual OMML conversion in Phase 5
-        if (element.classList.contains('math') || element.tagName === 'MATH') {
-          if (equationIndex < equations.length) {
-            const eq = equations[equationIndex];
-            blocks.push({
-              type: 'math',
-              omml: eq.omml,
-              latex: undefined, // Will be converted in Phase 5
-              fallbackText: element.textContent || '[Equation]',
-              renderStatus: 'partial'
-            });
-            equationIndex++;
-          }
-        }
+        });
       }
+      
+      // Add paragraph break after each paragraph
+      blocks.push({
+        type: 'paragraph_break'
+      });
+    });
+    
+    // Process tables
+    const tables = doc.body.querySelectorAll('table');
+    tables.forEach(table => {
+      const rows: string[][] = [];
+      const trs = table.querySelectorAll('tr');
+      trs.forEach(tr => {
+        const row: string[] = [];
+        tr.querySelectorAll('td, th').forEach(cell => {
+          row.push(cell.textContent?.trim() || '');
+        });
+        rows.push(row);
+      });
+      
+      if (rows.length > 0) {
+        blocks.push({
+          type: 'table',
+          rows
+        });
+      }
+    });
+    
+    // Insert equations based on text content matching
+    // For now, add detected equations as separate blocks
+    if (equations.length > 0) {
+      console.log(`📐 Processing ${equations.length} equations...`);
+      
+      equations.forEach((eq, idx) => {
+        // Try to convert OMML to LaTeX
+        const latex = this.convertOMMLToLatex(eq.omml);
+        
+        blocks.push({
+          type: 'math',
+          omml: eq.omml,
+          latex: latex || undefined,
+          fallbackText: `[Equation ${idx + 1}]`,
+          renderStatus: latex ? 'success' : 'partial'
+        });
+      });
     }
     
-    return this.mergeAdjacentTextBlocks(blocks);
+    return blocks;
+  }
+
+  /**
+   * Convert OMML to LaTeX (basic implementation)
+   * Will be improved in Phase 5 with OMMLConverter
+   */
+  private convertOMMLToLatex(omml: string): string | null {
+    try {
+      const { OMMLConverter } = require('./OMMLConverter');
+      const converter = new OMMLConverter();
+      const result = converter.convertToLatex(omml);
+      
+      if (result.success) {
+        console.log(`✅ OMML → LaTeX: ${result.latex.substring(0, 50)}...`);
+        return result.latex;
+      } else {
+        console.warn(`⚠️ OMML conversion failed:`, result.errors);
+        return null;
+      }
+    } catch (err) {
+      console.error('OMML conversion error:', err);
+      return null;
+    }
   }
 
   /**
