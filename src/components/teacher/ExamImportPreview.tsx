@@ -24,7 +24,7 @@ import {
   FileText,
   Image as ImageIcon,
   Table as TableIcon,
-  Function
+  FunctionSquare
 } from 'lucide-react';
 
 interface ExamImportPreviewProps {
@@ -97,7 +97,7 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
         } else if (block.fallbackText) {
           return (
             <span key={index} className="inline-block mx-1 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-xs">
-              <Function className="w-3 h-3 inline mr-1" />
+              <FunctionSquare className="w-3 h-3 inline mr-1" />
               {block.fallbackText}
               <span className="text-amber-600 ml-1">(chưa convert)</span>
             </span>
@@ -116,7 +116,7 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
             />
             {block.isMathEquation && (
               <p className="text-xs text-slate-500 mt-1">
-                <Function className="w-3 h-3 inline" /> Equation as image
+                <FunctionSquare className="w-3 h-3 inline" /> Equation as image
               </p>
             )}
           </div>
@@ -186,7 +186,7 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
 
             {question.parseMetadata.hasEquations && (
               <div className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded">
-                <Function className="w-3 h-3" />
+                <FunctionSquare className="w-3 h-3" />
                 {question.parseMetadata.equationCount}
               </div>
             )}
