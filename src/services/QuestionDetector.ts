@@ -47,7 +47,7 @@ export class QuestionDetector {
   private readonly QUESTION_PATTERNS = [
     { regex: /^Câu\s+(\d+)[.:)]\s*/i, type: 'vietnamese' },
     { regex: /^Question\s+(\d+)[.:)]\s*/i, type: 'english' },
-    { regex: /^(\d+)[.:)]\s+/, type: 'number' },
+    { regex: /^(\d+)[.:)]\s+/,type: 'number' },
     { regex: /^([IVX]+)[.:)]\s+/, type: 'roman' },
   ];
 
@@ -60,8 +60,8 @@ export class QuestionDetector {
 
   // Choice patterns (A, B, C, D or a, b, c, d)
   private readonly CHOICE_PATTERNS = [
-    /^([A-D])[.:)]\s+(.+)/,
-    /^([a-d])[.:)]\s+(.+)/
+    { regex: /^([A-D])[.:)]\s+(.+)/, type: 'upper' },
+    { regex: /^([a-d])[.:)]\s+(.+)/, type: 'lower' }
   ];
 
   constructor(config: ParserConfig) {
@@ -215,7 +215,7 @@ export class QuestionDetector {
    */
   private matchChoice(text: string): DetectedChoice | null {
     for (const pattern of this.CHOICE_PATTERNS) {
-      const match = text.match(pattern);
+      const match = text.match(pattern.regex);
       if (match) {
         return {
           label: match[1].toUpperCase(),
