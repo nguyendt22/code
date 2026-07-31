@@ -255,17 +255,17 @@ export class QuestionDetector {
     // Determine question type based on choices
     let type: QuestionType = 'short_answer';
     
-    // Check for sub-questions (a, b, c, d format) FIRST
-    const hasSubQuestions = choices.some(c => /^[a-d]$/i.test(c.label));
+    // Check for sub-questions (LOWERCASE a, b, c, d ONLY)
+    const hasSubQuestions = choices.some(c => /^[a-d]$/.test(c.label)); // NO 'i' flag!
     
     if (hasSubQuestions) {
       // Lowercase letters = sub-questions, not main choices
       type = 'short_answer'; // Will have subQuestions array instead
-      console.log(`  📝 Detected sub-questions (a/b/c/d format) → type: short_answer`);
+      console.log(`  📝 Detected sub-questions (lowercase a/b/c/d) → type: short_answer`);
     } else if (choices.length >= 2) {
-      // Uppercase letters = main choices → MCQ
+      // Uppercase letters A/B/C/D = main choices → MCQ
       type = 'mcq4'; // Default all multi-choice to mcq4
-      console.log(`  ✅ Detected ${choices.length} main choices (A/B/C/D) → type: mcq4`);
+      console.log(`  ✅ Detected ${choices.length} main choices (uppercase A/B/C/D) → type: mcq4`);
     } else {
       console.log(`  📝 No choices detected → type: short_answer`);
     }
