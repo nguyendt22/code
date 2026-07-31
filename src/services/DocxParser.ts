@@ -297,12 +297,12 @@ export class DocxParser {
   }
 
   /**
-   * Convert OMML to LaTeX (basic implementation)
-   * Will be improved in Phase 5 with OMMLConverter
+   * Convert OMML to LaTeX using OMMLConverter
    */
-  private convertOMMLToLatex(omml: string): string | null {
+  private async convertOMMLToLatexAsync(omml: string): Promise<string | null> {
     try {
-      const { OMMLConverter } = require('./OMMLConverter');
+      // Dynamic import for browser compatibility
+      const { OMMLConverter } = await import('./OMMLConverter');
       const converter = new OMMLConverter();
       const result = converter.convertToLatex(omml);
       
@@ -311,10 +311,123 @@ export class DocxParser {
         return result.latex;
       } else {
         console.warn(`  ⚠️ OMML → LaTeX FAILED:`, result.errors);
-        return null;
+        return this.fallbackOMMLConversion(omml);
       }
     } catch (err: any) {
       console.error('  ❌ OMML conversion ERROR:', err.message || err);
+      return this.fallbackOMMLConversion(omml);
+    }
+  }
+
+  /**
+   * Synchronous wrapper with inline converter
+   */
+  private convertOMMLToLatex(omml: string): string | null {
+    try {
+      // Inline instantiation to avoid import issues
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(omml, 'text/xml');
+      
+      const parseError = doc.querySelector('parsererror');
+      if (parseError) {
+        console.warn(`  ⚠️ XML parse error, using fallback`);
+        return this.fallbackOMMLConversion(omml);
+      }
+      
+      const oMath = doc.querySelector('oMath, m\\:oMath');
+      if (!oMath) {
+        console.warn(`  ⚠️ No oMath element, using fallback`);
+        return this.fallbackOMMLConversion(omml);
+      }
+      
+      // Simple inline conversion for common cases
+      const latex = this.simpleOMMLToLatex(oMath);
+      
+      if (latex) {
+        console.log(`  ✅ Inline OMML → LaTeX: ${latex.substring(0, 80)}...`);
+        return latex;
+      }
+      
+      return this.fallbackOMMLConversion(omml);
+      
+    } catch (err: any) {
+      console.error('  ❌ OMML conversion ERROR:', err.message || err);
+      return this.fallbackOMMLConversion(omml);
+    }
+  }
+
+  /**
+   * Simple inline OMML to LaTeX converter
+   */
+  private simpleOMMLToLatex(node: Element): string | null {
+    try {
+      // Get all text content
+      const text = node.textContent || '';
+      
+      // Check for fractions
+      const fracNum = node.querySelector('num');
+      const fracDen = node.querySelector('den');
+      if (fracNum && fracDen) {
+        const num = fracNum.textContent?.trim() || '';
+        const den = fracDen.textContent?.trim() || '';
+        return `\\frac{${num}}{${den}}`;
+      }
+      
+      // Check for superscript
+      const sup = node.querySelector('sup');
+      if (sup) {
+        const base = node.querySelector('e')?.textContent?.trim() || '';
+        const power = sup.textContent?.trim() || '';
+        return `{${base}}^{${power}}`;
+      }
+      
+      // Check for subscript
+      const sub = node.querySelector('sub');
+      if (sub) {
+        const base = node.querySelector('e')?.textContent?.trim() || '';
+        const subscript = sub.textContent?.trim() || '';
+        return `{${base}}_{${subscript}}`;
+      }
+      
+      // Check for square root
+      const rad = node.querySelector('rad');
+      if (rad) {
+        const content = node.querySelector('e')?.textContent?.trim() || '';
+        return `\\sqrt{${content}}`;
+      }
+      
+      // Fallback to text with basic symbol replacement
+      return this.fallbackOMMLConversion(text);
+      
+    } catch (err) {
+      return null;
+    }
+  }
+
+  /**
+   * Fallback: Simple OMML to LaTeX conversion
+   * For basic math when OMMLConverter fails
+   */
+  private fallbackOMMLConversion(omml: string): string | null {
+    try {
+      // Remove XML tags and extract text
+      let text = omml.replace(/<[^>]+>/g, ' ').trim();
+      
+      // Basic conversions
+      text = text.replace(/÷/g, '\\div');
+      text = text.replace(/×/g, '\\times');
+      text = text.replace(/≤/g, '\\leq');
+      text = text.replace(/≥/g, '\\geq');
+      text = text.replace(/≠/g, '\\neq');
+      text = text.replace(/√/g, '\\sqrt');
+      
+      if (text.length > 0) {
+        console.log(`  🔄 Fallback conversion: ${text.substring(0, 50)}...`);
+        return text;
+      }
+      
+      return null;
+    } catch (err) {
       return null;
     }
   }
