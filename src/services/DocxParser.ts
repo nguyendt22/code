@@ -30,19 +30,30 @@ export class DocxParser {
     const startTime = Date.now();
     
     // Step 1: Extract raw content with mammoth
+    console.log('📄 Step 1: Extracting DOCX content with mammoth...');
     const { htmlContent, images, rawXml } = await this.extractDocxContent(file);
+    console.log(`  ✅ HTML length: ${htmlContent.length}, Images: ${images.length}, XML length: ${rawXml.length}`);
     
     // Step 2: Extract equations from XML
+    console.log('📐 Step 2: Extracting OMML equations...');
     const equations = await this.extractEquations(file);
+    console.log(`  ✅ Found ${equations.length} OMML equations`);
     
     // Step 3: Parse HTML to content blocks
+    console.log('🧩 Step 3: Parsing HTML to ContentBlocks...');
     const contentBlocks = this.parseHtmlToBlocks(htmlContent, equations, images);
+    console.log(`  ✅ Created ${contentBlocks.length} content blocks`);
+    console.log(`  📊 Block types:`, contentBlocks.reduce((acc, b) => {
+      acc[b.type] = (acc[b.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>));
     
-    // Step 4: Detect questions (will implement in Phase 4)
-    // For now, return raw structure
+    // Step 4: Detect questions
+    console.log('🔍 Step 4: Detecting questions...');
     const { QuestionDetector } = await import('./QuestionDetector');
     const detector = new QuestionDetector(this.config);
     const detectedQuestions = detector.detectQuestions(contentBlocks);
+    console.log(`  ✅ Detected ${detectedQuestions.length} questions`);
     
     // Step 5: Convert to EnhancedQuestion objects
     const questions = detectedQuestions.map((dq, idx) => 
@@ -213,15 +224,19 @@ export class DocxParser {
         
         // Check for images in this paragraph
         const imgs = para.querySelectorAll('img');
-        imgs.forEach(img => {
+        console.log(`🖼️  Found ${imgs.length} images in paragraph`);
+        imgs.forEach((img, imgIdx) => {
           const src = img.getAttribute('src');
           if (src) {
+            console.log(`  ✅ Image ${imgIdx + 1}: src length = ${src.length}, starts with "${src.substring(0, 30)}..."`);
             blocks.push({
               type: 'image',
               src,
               alt: img.getAttribute('alt') || undefined,
               isMathEquation: false
             });
+          } else {
+            console.warn(`  ⚠️ Image ${imgIdx + 1}: NO SRC attribute!`);
           }
         });
       }
@@ -256,11 +271,17 @@ export class DocxParser {
     // Insert equations based on text content matching
     // For now, add detected equations as separate blocks
     if (equations.length > 0) {
-      console.log(`📐 Processing ${equations.length} equations...`);
+      console.log(`📐 Processing ${equations.length} equations for LaTeX conversion...`);
       
       equations.forEach((eq, idx) => {
         // Try to convert OMML to LaTeX
         const latex = this.convertOMMLToLatex(eq.omml);
+        
+        if (latex) {
+          console.log(`  ✅ Equation ${idx + 1}: LaTeX = "${latex.substring(0, 50)}..."`);
+        } else {
+          console.warn(`  ⚠️ Equation ${idx + 1}: Conversion FAILED, using fallback`);
+        }
         
         blocks.push({
           type: 'math',
@@ -286,14 +307,14 @@ export class DocxParser {
       const result = converter.convertToLatex(omml);
       
       if (result.success) {
-        console.log(`✅ OMML → LaTeX: ${result.latex.substring(0, 50)}...`);
+        console.log(`  ✅ OMML → LaTeX SUCCESS: ${result.latex.substring(0, 80)}...`);
         return result.latex;
       } else {
-        console.warn(`⚠️ OMML conversion failed:`, result.errors);
+        console.warn(`  ⚠️ OMML → LaTeX FAILED:`, result.errors);
         return null;
       }
-    } catch (err) {
-      console.error('OMML conversion error:', err);
+    } catch (err: any) {
+      console.error('  ❌ OMML conversion ERROR:', err.message || err);
       return null;
     }
   }

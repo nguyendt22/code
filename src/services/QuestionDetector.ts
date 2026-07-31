@@ -131,6 +131,7 @@ export class QuestionDetector {
         if (currentQuestion) {
           const choiceMatch = this.matchChoice(block.value);
           if (choiceMatch) {
+            console.log(`✅ Found choice: ${choiceMatch.label} - "${choiceMatch.text}"`);
             currentChoices.push(choiceMatch);
             
             // ALSO check if there are multiple choices in same line
@@ -139,6 +140,7 @@ export class QuestionDetector {
             if (remaining.trim()) {
               const secondChoice = this.matchChoice(remaining.trim());
               if (secondChoice) {
+                console.log(`✅ Found SECOND choice on same line: ${secondChoice.label} - "${secondChoice.text}"`);
                 currentChoices.push(secondChoice);
               }
             }
@@ -183,7 +185,10 @@ export class QuestionDetector {
       });
     }
 
-    console.log(`🔍 Detected ${questions.length} questions`);
+    console.log(`🔍 QuestionDetector: Processed ${blocks.length} blocks, detected ${questions.length} questions`);
+    questions.forEach((q, idx) => {
+      console.log(`  Q${idx + 1}: "${q.questionNumber}" with ${q.choices?.length || 0} choices, type: ${q.type}`);
+    });
     return questions;
   }
 
