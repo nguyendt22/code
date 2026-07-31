@@ -13,7 +13,7 @@ echo Installing mammoth and jszip...
 echo This will take 1-2 minutes...
 echo.
 
-call npm install mammoth@^1.8.0 jszip@^3.10.1
+call npm install
 
 echo.
 echo ========================================
