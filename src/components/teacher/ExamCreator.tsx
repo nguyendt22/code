@@ -268,6 +268,8 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
         setIsParsingDocx(true);
         
         try {
+          console.log('[ExamCreator] Starting DOCX parse:', file.name);
+          
           const parser = new DocumentParser({
             autoFormatMath: autoFormatEnabled,
             extractImages: true,
@@ -279,15 +281,20 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
             defaultDifficulty: "Trung bình"
           });
 
+          console.log('[ExamCreator] DocumentParser created, calling parseDocument...');
           const result = await parser.parseDocument(file);
+          console.log('[ExamCreator] Parse result:', result);
 
           if (!result.success || !result.document) {
-            alert("❌ Lỗi parse DOCX:\n\n" + result.errors.join("\n"));
+            const errorMsg = result.errors.join("\n") || "Unknown error";
+            console.error('[ExamCreator] Parse failed:', errorMsg);
+            alert("❌ Lỗi parse DOCX:\n\n" + errorMsg);
             setIsParsingDocx(false);
             e.target.value = "";
             return;
           }
 
+          console.log('[ExamCreator] Parse successful, showing preview...');
           // Show preview modal
           setParsedDocument(result.document);
           setShowImportPreview(true);
@@ -295,13 +302,14 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
 
           // Show warnings if any
           if (result.warnings.length > 0) {
-            console.warn('Parse warnings:', result.warnings);
+            console.warn('[ExamCreator] Parse warnings:', result.warnings);
           }
 
         } catch (err: any) {
-          console.error('DocumentParser error:', err);
-          alert("❌ Lỗi parse DOCX: " + err.message);
+          console.error('[ExamCreator] DocumentParser error:', err);
+          alert("❌ Lỗi parse DOCX: " + (err.message || err.toString()));
           setIsParsingDocx(false);
+          e.target.value = "";
         }
       } 
       // Old .doc format - fallback to old parser
