@@ -16,6 +16,9 @@ import { MathInputKeypad } from "../common/MathInputKeypad";
 import { autoFormatQuestion, smartFormatVietnameseQuestion, validateMathFormatting } from "../../utils/autoMathFormatter";
 import { importQuestionsFromExcel, downloadExcelTemplate } from "../../utils/excelImporter";
 import { importQuestionsFromWord, importQuestionsFromBulkText } from "../../utils/wordImporter";
+import { DocumentParser } from "../../services/DocumentParser";
+import { ExamImportPreview } from "./ExamImportPreview";
+import { ParsedExamDocument, EnhancedQuestion } from "../../types/exam";
 import {
   FileText, Plus, Upload, Save, Eye, Trash2, Edit3, Check, X,
   AlertCircle, ChevronUp, ChevronDown, Copy, FileSpreadsheet,
@@ -46,6 +49,9 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
   const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
   const [showBulkImportModal, setShowBulkImportModal] = useState(false);
   const [bulkImportText, setBulkImportText] = useState("");
+  const [showImportPreview, setShowImportPreview] = useState(false);
+  const [parsedDocument, setParsedDocument] = useState<ParsedExamDocument | null>(null);
+  const [isParsingDocx, setIsParsingDocx] = useState(false);
   
   // New question form
   const [newQuestionText, setNewQuestionText] = useState("");
@@ -248,7 +254,7 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
   };
 
   /**
-   * Import questions from text/Word file
+   * Import questions from text/Word file using NEW DocumentParser
    */
   const handleImportTextFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -257,8 +263,49 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
     try {
       const fileName = file.name.toLowerCase();
       
-      // Check if Word file
-      if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) {
+      // Check if Word file - use NEW parser
+      if (fileName.endsWith('.docx')) {
+        setIsParsingDocx(true);
+        
+        try {
+          const parser = new DocumentParser({
+            autoFormatMath: autoFormatEnabled,
+            extractImages: true,
+            detectQuestionTypes: true,
+            detectSections: true,
+            validateStructure: true,
+            defaultGrade: examGrade,
+            defaultCognitive: "Thông hiểu",
+            defaultDifficulty: "Trung bình"
+          });
+
+          const result = await parser.parseDocument(file);
+
+          if (!result.success || !result.document) {
+            alert("❌ Lỗi parse DOCX:\n\n" + result.errors.join("\n"));
+            setIsParsingDocx(false);
+            e.target.value = "";
+            return;
+          }
+
+          // Show preview modal
+          setParsedDocument(result.document);
+          setShowImportPreview(true);
+          setIsParsingDocx(false);
+
+          // Show warnings if any
+          if (result.warnings.length > 0) {
+            console.warn('Parse warnings:', result.warnings);
+          }
+
+        } catch (err: any) {
+          console.error('DocumentParser error:', err);
+          alert("❌ Lỗi parse DOCX: " + err.message);
+          setIsParsingDocx(false);
+        }
+      } 
+      // Old .doc format - fallback to old parser
+      else if (fileName.endsWith('.doc')) {
         const result = await importQuestionsFromWord(file, {
           grade: examGrade,
           autoFormat: autoFormatEnabled
@@ -278,14 +325,14 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
         }
         
         alert(message);
-      } else {
-        // Plain text file
+      } 
+      // Plain text file
+      else {
         const reader = new FileReader();
         reader.onload = (event) => {
           const text = event.target?.result as string;
           if (!text) return;
 
-          // Simple parser: each line is a question
           const lines = text.split('\n').filter(line => line.trim().length > 5);
           
           const imported: Question[] = lines.map((line, idx) => {
@@ -318,9 +365,66 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
       }
     } catch (err: any) {
       alert("❌ Lỗi import file: " + err.message);
+      setIsParsingDocx(false);
     }
     
     e.target.value = ""; // Reset input
+  };
+
+  /**
+   * Handle accept from import preview
+   */
+  const handleAcceptImport = (questions: EnhancedQuestion[]) => {
+    // Convert EnhancedQuestion to Question
+    const convertedQuestions: Question[] = questions.map(eq => {
+      // Convert content blocks back to text for backward compatibility
+      const text = eq.content
+        .map(block => {
+          if (block.type === 'text') return block.value;
+          if (block.type === 'math' && block.latex) return `$${block.latex}$`;
+          if (block.type === 'math' && block.fallbackText) return block.fallbackText;
+          return '';
+        })
+        .filter(t => t)
+        .join(' ');
+
+      // Convert choices if MCQ
+      let options: string[] | undefined;
+      let correctAnswer: any = eq.correctAnswer;
+      
+      if (eq.choices && eq.choices.length > 0) {
+        options = eq.choices.map(choice => 
+          choice.content.map(b => b.type === 'text' ? b.value : '').join(' ')
+        );
+        // Find correct answer index
+        const correctIdx = eq.choices.findIndex(c => c.isCorrect);
+        if (correctIdx >= 0) correctAnswer = correctIdx;
+      }
+
+      return {
+        id: eq.id,
+        text,
+        type: eq.type,
+        options,
+        correctAnswer,
+        explanation: eq.explanation,
+        grade: eq.grade,
+        semester: eq.semester,
+        chapterId: eq.chapterId,
+        chapterName: eq.chapterName,
+        lessonId: eq.lessonId,
+        lessonName: eq.lessonName,
+        topicName: eq.topicName,
+        cognitiveLevel: eq.cognitiveLevel,
+        difficulty: eq.difficulty,
+        tags: eq.tags
+      };
+    });
+
+    setExamQuestions([...examQuestions, ...convertedQuestions]);
+    setShowImportPreview(false);
+    setParsedDocument(null);
+    alert(`✅ Đã import thành công ${convertedQuestions.length} câu hỏi!`);
   };
 
   return (
@@ -501,15 +605,24 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
                   />
                 </label>
                 
-                <label className="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer">
+                <label className="px-4 py-2 bg-slate-500 hover:bg-slate-600 text-white rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer relative">
                   <Upload className="w-4 h-4 inline mr-1" />
-                  Upload File Text
+                  {isParsingDocx ? 'Đang xử lý...' : 'Upload DOCX'}
                   <input
                     type="file"
                     accept=".txt,.doc,.docx"
                     onChange={handleImportTextFile}
+                    disabled={isParsingDocx}
                     className="hidden"
                   />
+                  {isParsingDocx && (
+                    <span className="absolute inset-0 bg-slate-600 rounded-xl flex items-center justify-center">
+                      <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                    </span>
+                  )}
                 </label>
 
                 <button
@@ -901,6 +1014,18 @@ export const ExamCreator: React.FC<ExamCreatorProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import Preview Modal */}
+      {showImportPreview && parsedDocument && (
+        <ExamImportPreview
+          document={parsedDocument}
+          onAccept={handleAcceptImport}
+          onCancel={() => {
+            setShowImportPreview(false);
+            setParsedDocument(null);
+          }}
+        />
       )}
     </div>
   );
