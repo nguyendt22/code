@@ -252,25 +252,28 @@ export class QuestionDetector {
     choices: DetectedChoice[],
     section?: string
   ): DetectedQuestion {
-    // Determine question type
+    // Determine question type based on choices
     let type: QuestionType = 'short_answer';
     
-    if (choices.length >= 2) {
-      // DEFAULT to mcq4 for 2-4 choices (teacher can change later)
-      if (choices.length === 4) {
-        type = 'mcq4';
-      } else if (choices.length === 3) {
-        type = 'mcq4'; // 3 choices still MCQ
-      } else if (choices.length === 2) {
-        type = 'mcq4'; // 2 choices - could be true/false but default to MCQ for flexibility
-      }
-    }
-
-    // Check for sub-questions (a, b, c, d format) - override to short_answer with sub-questions
+    // Check for sub-questions (a, b, c, d format) FIRST
     const hasSubQuestions = choices.some(c => /^[a-d]$/i.test(c.label));
+    
     if (hasSubQuestions) {
+      // Lowercase letters = sub-questions, not main choices
       type = 'short_answer'; // Will have subQuestions array instead
+      console.log(`  📝 Detected sub-questions (a/b/c/d format) → type: short_answer`);
+    } else if (choices.length >= 2) {
+      // Uppercase letters = main choices → MCQ
+      type = 'mcq4'; // Default all multi-choice to mcq4
+      console.log(`  ✅ Detected ${choices.length} main choices (A/B/C/D) → type: mcq4`);
+    } else {
+      console.log(`  📝 No choices detected → type: short_answer`);
     }
+    
+    console.log(`  📊 Finalized Q with ${choices.length} choices → type: ${type}`);
+
+    // Check for sub-questions (a, b, c, d format) - already checked above, this line is redundant
+    // Removed duplicate check
 
     // Convert choices to proper format
     const questionChoices = choices.length >= 2 ? choices.map(c => ({
@@ -281,6 +284,8 @@ export class QuestionDetector {
       }],
       isCorrect: false
     })) : undefined;
+    
+    console.log(`  ✅ Created ${choices.length} choice objects for question`);
 
     return {
       questionNumber: partial.questionNumber || '?',
