@@ -43,6 +43,7 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
   const [expandedQuestions, setExpandedQuestions] = useState<Set<number>>(new Set([0]));
   const [selectedIssues, setSelectedIssues] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState<'preview' | 'issues' | 'metadata'>('preview');
+  const [editedQuestions, setEditedQuestions] = useState<Map<number, Partial<EnhancedQuestion>>>(new Map());
 
   const toggleQuestion = (index: number) => {
     const newExpanded = new Set(expandedQuestions);
@@ -52,6 +53,18 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
       newExpanded.add(index);
     }
     setExpandedQuestions(newExpanded);
+  };
+
+  const updateQuestionType = (index: number, newType: string) => {
+    const updates = new Map(editedQuestions);
+    const current = updates.get(index) || {};
+    updates.set(index, { ...current, type: newType as any });
+    setEditedQuestions(updates);
+  };
+
+  const getQuestionData = (question: EnhancedQuestion, index: number): EnhancedQuestion => {
+    const edits = editedQuestions.get(index);
+    return edits ? { ...question, ...edits } : question;
   };
 
   const expandAll = () => {
@@ -151,8 +164,9 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
 
   const renderQuestion = (question: EnhancedQuestion, index: number) => {
     const isExpanded = expandedQuestions.has(index);
-    const statusColor = getStatusColor(question.parseMetadata.parseStatus);
-    const statusIcon = getStatusIcon(question.parseMetadata.parseStatus);
+    const questionData = getQuestionData(question, index);
+    const statusColor = getStatusColor(questionData.parseMetadata.parseStatus);
+    const statusIcon = getStatusIcon(questionData.parseMetadata.parseStatus);
 
     return (
       <div key={question.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -199,8 +213,25 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
             )}
 
             <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded">
-              {question.type}
+              {questionData.type}
             </span>
+            
+            {/* Quick type selector */}
+            <select
+              value={questionData.type}
+              onChange={(e) => {
+                e.stopPropagation();
+                updateQuestionType(index, e.target.value);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="text-xs border border-slate-300 rounded px-2 py-1 bg-white hover:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              title="Thay đổi dạng câu hỏi"
+            >
+              <option value="mcq4">Trắc nghiệm 4 đáp án</option>
+              <option value="true_false">Đúng/Sai</option>
+              <option value="short_answer">Tự luận ngắn</option>
+              <option value="essay">Tự luận dài</option>
+            </select>
           </div>
 
           <div className="flex items-center gap-2">
@@ -226,16 +257,16 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
             <div className="space-y-2">
               <h4 className="text-sm font-bold text-slate-700">Nội dung câu hỏi:</h4>
               <div className="text-base text-slate-900 leading-relaxed">
-                {question.content.map((block, idx) => renderContentBlock(block, idx))}
+                {questionData.content.map((block, idx) => renderContentBlock(block, idx))}
               </div>
             </div>
 
             {/* Choices (MCQ) */}
-            {question.choices && question.choices.length > 0 && (
+            {questionData.choices && questionData.choices.length > 0 && (
               <div className="space-y-2">
                 <h4 className="text-sm font-bold text-slate-700">Đáp án:</h4>
                 <div className="space-y-2">
-                  {question.choices.map((choice, cIdx) => (
+                  {questionData.choices.map((choice, cIdx) => (
                     <div 
                       key={cIdx}
                       className={`p-3 rounded-lg border text-sm ${
@@ -260,7 +291,7 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
               <div className="space-y-2">
                 <h4 className="text-sm font-bold text-slate-700">Các câu con:</h4>
                 <div className="space-y-2">
-                  {question.subQuestions.map((sub, sIdx) => (
+                  {questionData.subQuestions.map((sub, sIdx) => (
                     <div key={sIdx} className="p-3 rounded-lg border border-slate-200 bg-slate-50 text-sm">
                       <span className="font-bold mr-2">{sub.label})</span>
                       {sub.content.map((block, bIdx) => renderContentBlock(block, bIdx))}
@@ -271,7 +302,7 @@ export const ExamImportPreview: React.FC<ExamImportPreviewProps> = ({
             )}
 
             {/* Warnings/Errors */}
-            {(question.parseMetadata.warnings.length > 0 || question.parseMetadata.errors.length > 0) && (
+            {(questionData.parseMetadata.warnings.length > 0 || questionData.parseMetadata.errors.length > 0) && (
               <div className="space-y-2">
                 {question.parseMetadata.errors.length > 0 && (
                   <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm">

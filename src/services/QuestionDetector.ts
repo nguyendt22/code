@@ -132,6 +132,17 @@ export class QuestionDetector {
           const choiceMatch = this.matchChoice(block.value);
           if (choiceMatch) {
             currentChoices.push(choiceMatch);
+            
+            // ALSO check if there are multiple choices in same line
+            // e.g., "A. choice A B. choice B"
+            const remaining = block.value.substring(block.value.indexOf(choiceMatch.text) + choiceMatch.text.length);
+            if (remaining.trim()) {
+              const secondChoice = this.matchChoice(remaining.trim());
+              if (secondChoice) {
+                currentChoices.push(secondChoice);
+              }
+            }
+            
             continue;
           }
         }
@@ -240,17 +251,20 @@ export class QuestionDetector {
     let type: QuestionType = 'short_answer';
     
     if (choices.length >= 2) {
+      // DEFAULT to mcq4 for 2-4 choices (teacher can change later)
       if (choices.length === 4) {
         type = 'mcq4';
+      } else if (choices.length === 3) {
+        type = 'mcq4'; // 3 choices still MCQ
       } else if (choices.length === 2) {
-        type = 'true_false';
+        type = 'mcq4'; // 2 choices - could be true/false but default to MCQ for flexibility
       }
     }
 
-    // Check for sub-questions (a, b, c, d format)
+    // Check for sub-questions (a, b, c, d format) - override to short_answer with sub-questions
     const hasSubQuestions = choices.some(c => /^[a-d]$/i.test(c.label));
     if (hasSubQuestions) {
-      type = 'true_false';
+      type = 'short_answer'; // Will have subQuestions array instead
     }
 
     // Convert choices to proper format
